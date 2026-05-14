@@ -1,0 +1,15 @@
+.env
+.env.local
+.env.*.local
+__pycache__/
+*.pyc
+*.pyo
+.vercel
+.DS_Store
+.python-version
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+line_artwork/
