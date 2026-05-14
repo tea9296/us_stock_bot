@@ -7,11 +7,9 @@
     }
   ],
   "functions": {
-    "api/cron.py": {
-      "maxDuration": 60
-    },
-    "api/webhook.py": {
-      "maxDuration": 30
+    "api/**/*.py": {
+      "maxDuration": 60,
+      "runtime": "@vercel/python@4.3.1"
     }
   }
 }
