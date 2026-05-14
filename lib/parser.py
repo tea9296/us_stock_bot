@@ -8,6 +8,10 @@ Supported syntax (case-insensitive, Chinese or English):
   del NVDA             -> ("remove", ["NVDA"])
   remove NVDA          -> ("remove", ["NVDA"])
   -NVDA                -> ("remove", ["NVDA"])
+  查 NVDA              -> ("query", ["NVDA"])
+  查 NVDA TSM          -> ("query", ["NVDA", "TSM"])
+  q NVDA / query NVDA  -> ("query", ["NVDA"])
+  ?NVDA                -> ("query", ["NVDA"])
   list / 清單 / ls     -> ("list", [])
   help / 說明 / ?      -> ("help", [])
   anything else        -> ("unknown", [])
@@ -18,8 +22,10 @@ import re
 from typing import List, Tuple
 
 # Order matters: longer / more specific keywords first.
+# `query` must come before `q` in length matching; we sort longest-first below.
 _ADD_PREFIXES = ("加", "add", "+")
 _REMOVE_PREFIXES = ("刪", "删", "delete", "del", "remove", "rm", "-")
+_QUERY_PREFIXES = ("查", "query", "q", "?", "？")
 _LIST_WORDS = {"list", "ls", "清單", "清单"}
 _HELP_WORDS = {"help", "說明", "说明", "?", "？"}
 
@@ -57,7 +63,9 @@ def parse(text: str) -> Tuple[str, List[str]]:
     if low in _LIST_WORDS or raw in _LIST_WORDS:
         return ("list", [])
 
-    # Prefix-style commands.
+    # Prefix-style commands. Order: add/remove first (most common), then query.
+    # `?` is also a help word, but only if it's the *entire* message (handled
+    # above); a `?NVDA` should fall through to query.
     for p in _ADD_PREFIXES:
         if low.startswith(p):
             rest = raw[len(p):]
@@ -66,5 +74,11 @@ def parse(text: str) -> Tuple[str, List[str]]:
         if low.startswith(p):
             rest = raw[len(p):]
             return ("remove", _extract_symbols(rest))
+    for p in _QUERY_PREFIXES:
+        if low.startswith(p):
+            rest = raw[len(p):]
+            syms = _extract_symbols(rest)
+            if syms:
+                return ("query", syms)
 
     return ("unknown", [])

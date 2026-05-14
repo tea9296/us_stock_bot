@@ -20,7 +20,12 @@ from typing import List
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lib.config import LINE_USER_ID  # noqa: E402
-from lib.formatter import HELP_TEXT, format_empty, format_watchlist  # noqa: E402
+from lib.formatter import (  # noqa: E402
+    HELP_TEXT,
+    format_empty,
+    format_query,
+    format_watchlist,
+)
 from lib.line_api import reply_text, verify_signature  # noqa: E402
 from lib.notion_db import add_symbol, get_watchlist, remove_symbol  # noqa: E402
 from lib.parser import parse  # noqa: E402
@@ -95,6 +100,17 @@ def _handle_list() -> str:
     return format_watchlist(rows)
 
 
+def _handle_query(args: List[str]) -> str:
+    if not args:
+        return "⚠️ 請給股票代號，例如：查 NVDA"
+    # Cap to a sane number so a single message can't fan out 100 yfinance
+    # requests inside the 10s webhook timeout.
+    if len(args) > 10:
+        return "⚠️ 一次最多查 10 檔"
+    rows = fetch_batch(args)
+    return format_query(rows)
+
+
 def _dispatch(text: str) -> str:
     cmd, args = parse(text)
     if cmd == "help":
@@ -105,6 +121,8 @@ def _dispatch(text: str) -> str:
         return _handle_add(args)
     if cmd == "remove":
         return _handle_remove(args)
+    if cmd == "query":
+        return _handle_query(args)
     return "🤔 不懂這個指令，輸入 help 看用法"
 
 

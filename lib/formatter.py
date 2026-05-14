@@ -33,10 +33,9 @@ def _fmt_pct(p: Optional[float]) -> str:
     return f"{sign}{p:.2f}%"
 
 
-def format_watchlist(rows: List[Dict]) -> str:
-    today = datetime.now(_TZ).strftime("%Y/%m/%d %a")
-    lines = [f"📊 {today} 美股清單", ""]
-
+def _render_rows(rows: List[Dict]) -> List[str]:
+    """Shared row-rendering logic for watchlist and query views."""
+    lines: List[str] = []
     for row in rows:
         sym = row.get("symbol", "?")
         if row.get("error"):
@@ -60,10 +59,24 @@ def format_watchlist(rows: List[Dict]) -> str:
                 f"  盤前 {_fmt_price(row['pre_price'])} "
                 f"({_fmt_pct(row.get('pre_change_pct'))})"
             )
+    return lines
 
+
+def format_watchlist(rows: List[Dict]) -> str:
+    today = datetime.now(_TZ).strftime("%Y/%m/%d %a")
+    lines = [f"📊 {today} 美股清單", ""]
+    lines.extend(_render_rows(rows))
     lines.append("")
     lines.append("─────────────")
     lines.append("加 SYMBOL  /  刪 SYMBOL  /  list  /  help")
+    return "\n".join(lines)
+
+
+def format_query(rows: List[Dict]) -> str:
+    """Render a one-off price query (not from the watchlist)."""
+    now = datetime.now(_TZ).strftime("%Y/%m/%d %H:%M")
+    lines = [f"🔍 股價查詢  ({now})", ""]
+    lines.extend(_render_rows(rows))
     return "\n".join(lines)
 
 
@@ -79,6 +92,8 @@ HELP_TEXT = (
     "加 NVDA              加入一檔\n"
     "加 NVDA TSM AAPL     一次加多檔\n"
     "刪 NVDA              移除\n"
+    "查 NVDA              即時查價\n"
+    "查 NVDA TSM          一次查多檔\n"
     "list / 清單          看目前清單 + 現價\n"
     "help                 這個說明\n\n"
     "每天台灣時間 6:00 會自動推當天清單。"
