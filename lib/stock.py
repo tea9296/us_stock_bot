@@ -68,7 +68,12 @@ def _pct(curr: Optional[float], base: Optional[float]) -> Optional[float]:
 def _fetch_one(symbol: str, timeout: float = 8.0) -> Dict:
     """Fetch one symbol with retries on 429. Always returns a dict, never raises."""
     session = _get_session()
-    params = {"interval": "1d", "range": "2d", "includePrePost": "true"}
+    # range=5d (not 2d): we need 2 daily candles to compute change_pct from
+    # yesterday's close. `meta.chartPreviousClose` is the close from BEFORE
+    # the chart range starts — with range=2d that's 2 trading days ago,
+    # giving wrong percentages. 5d covers normal weeks, holidays, and the
+    # occasional missing candle.
+    params = {"interval": "1d", "range": "5d", "includePrePost": "true"}
     last_err = "unknown"
 
     for attempt in range(3):
@@ -107,10 +112,32 @@ def _fetch_one(symbol: str, timeout: float = 8.0) -> Dict:
         if not results:
             err = (chart.get("error") or {}).get("description") or "no data"
             return {"symbol": symbol, "error": err}
-        meta = results[0].get("meta") or {}
+        result0 = results[0]
+        meta = result0.get("meta") or {}
 
         last_price = meta.get("regularMarketPrice")
-        prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+
+        # Previous close: pull from the daily candle series, not from
+        # meta.chartPreviousClose. The latter is the close BEFORE the chart
+        # range starts (e.g. range=5d → close from 6+ trading days ago), so
+        # using it gives wrong percentages on every day except by coincidence.
+        # We want yesterday's close = the candle right before today's.
+        indicators = (result0.get("indicators") or {}).get("quote") or [{}]
+        closes = indicators[0].get("close") or []
+        valid_closes = [c for c in closes if c is not None]
+
+        prev_close: Optional[float] = None
+        if len(valid_closes) >= 2:
+            # Last entry is today's close (or current intraday if still open);
+            # second-to-last is the previous trading day's close.
+            prev_close = float(valid_closes[-2])
+        else:
+            # Single candle (first trading day after a long halt, etc.) —
+            # fall back to chartPreviousClose so we still return *something*.
+            cpc = meta.get("chartPreviousClose") or meta.get("previousClose")
+            if cpc is not None:
+                prev_close = float(cpc)
+
         if last_price is None or prev_close is None:
             return {"symbol": symbol, "error": "missing price fields"}
 
